@@ -1,4 +1,4 @@
-# Advanced Sample Hardhat Project
+# hyperaschain contract for token 
 
 This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
 
