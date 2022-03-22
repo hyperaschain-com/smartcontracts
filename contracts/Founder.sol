@@ -2,9 +2,10 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract Founder is Ownable 
+contract Founder is Ownable,ReentrancyGuard
 
 {
     using SafeERC20 for ERC20;
@@ -13,8 +14,7 @@ contract Founder is Ownable
     uint256 public saleDiv;
     ERC20 public buyToken;
 
-    uint256 public totalLockedAmount;
-    uint256 public totalLockedEventAmount;
+
     uint8 public currentRound;
     bool public tokenGenerationEvent = false;
 
@@ -22,6 +22,15 @@ contract Founder is Ownable
     event ReleaseMyTokenEvent(uint256 _index);
     event TransferAndLock(address _lockedAddress,uint256 _amount,uint _releaseDays);
     event TransferAndLockEvent(address _address,uint256 _amount);
+    event SetTokenGenerationEvent(bool _event);
+    event SetPercentRelease(uint8 _index, uint8 _percent);
+    event SetTotalTokenByRound(uint8 _index, uint256 _quantity);
+    event SetCurrentRound(uint8 _round);
+    event SetSalePrice(uint256 _salePrice, uint256 _saleDiv);
+    event ChangeBuyToken(ERC20 _token) ;
+    event ReleaseAllMyTokenEvent();
+    
+
 
     
     struct LockItemByTime
@@ -56,22 +65,26 @@ contract Founder is Ownable
 
     function setTokenGenerationEvent(bool _tokenGenerationEvent)  external onlyOwner {
         tokenGenerationEvent = _tokenGenerationEvent;
+        emit SetTokenGenerationEvent(tokenGenerationEvent);
     }
 
     function setPercentRelease(uint8 _index, uint8 _percent) external onlyOwner {
         percentRelease[_index] = _percent;
+        emit SetPercentRelease(_index, _percent);
     }
 
     function setTotalTokenByRound(uint8 _index, uint256 _quantity) external onlyOwner {
         totalTokenByRound[_index] = _quantity;
+        emit SetTotalTokenByRound(_index, _quantity);
     }
 
     function setCurrentRound(uint8 _round) external onlyOwner{
         currentRound = _round;
+        emit SetCurrentRound(currentRound);
     }
 
 
-    function buy(uint256 _amount) public {
+    function buy(uint256 _amount)   external nonReentrant { 
 
         uint256 cost = _amount*salePrice/saleDiv;
         buyToken.safeTransferFrom(msg.sender, address(this), cost);
@@ -88,6 +101,7 @@ contract Founder is Ownable
         {
             currentRound = 3;
         }
+        else{}
         
         if(currentRound>=0 && currentRound<3)
         {
@@ -100,7 +114,6 @@ contract Founder is Ownable
             totalTokenSold += _amount-tempAmount;
 
             for(uint256 i = 1; i <= currentTimes; i++)
-            //for(uint256 i = 0; i < currentTimes; i++)
             {
                 transferAndLock(msg.sender, lockAmount, 30*i);
             }
@@ -109,16 +122,17 @@ contract Founder is Ownable
         }
         else if(currentRound == 3)
         {
-            sellToken.transfer(msg.sender, _amount);
+            sellToken.safeTransfer(msg.sender, _amount);
             totalTokenSold += _amount;
         }
-        
+        else{}
         
         
     }
     function setSalePrice(uint256 _salePrice, uint256 _saleDiv) external onlyOwner {
         salePrice = _salePrice;
         saleDiv = _saleDiv;
+        emit SetSalePrice(salePrice, saleDiv);
         
     }
     function changeSellToken(ERC20 _token) external onlyOwner {
@@ -127,6 +141,7 @@ contract Founder is Ownable
 
     function changeBuyToken(ERC20 _token) external onlyOwner {
         buyToken = _token;
+        emit ChangeBuyToken(_token);
     }     
 
     function getLockedAmountAt(address _lockedAddress, uint256 _index) public view returns(uint256 _amount)
@@ -152,17 +167,18 @@ contract Founder is Ownable
         return lockListByTime[_lockedAddress][_index].releaseDate;
 	}
 
-    function getLockedListSize(address _lockedAddress) public view returns(uint256 _length)
+
+    function getLockedListSize(address _lockedAddress) internal view returns(uint256 _length)
     {
             return lockListByTime[_lockedAddress].length;
     }
 
-    function getLockedEventListSize(address _lockedAddress) public view returns(uint256 _length)
+    function getLockedEventListSize(address _lockedAddress) internal view returns(uint256 _length)
     {
             return lockListByEvent[_lockedAddress].length;
     }
 
-	function getAvailableAmount(address _lockedAddress) public view returns(uint256 _amount)
+	function getAvailableAmount(address _lockedAddress) external view returns(uint256 _amount)
 	{
 	    uint256 availabelAmount =0;
 	    for(uint256 j = 0;j<getLockedListSize(_lockedAddress);j++)
@@ -178,7 +194,7 @@ contract Founder is Ownable
 	    return availabelAmount;
 	}
 
-    function getAvailableEventAmount(address _lockedAddress) public view returns(uint256 _amount)
+    function getAvailableEventAmount(address _lockedAddress) external view returns(uint256 _amount)
     {
         uint256 availabelAmount =0;
         for(uint256 j = 0;j<getLockedEventListSize(_lockedAddress);j++)
@@ -193,7 +209,7 @@ contract Founder is Ownable
         return availabelAmount;
     }
 
-    function getLockedFullAmount(address _lockedAddress) public view returns(uint256 _amount)
+    function getLockedFullAmount(address _lockedAddress) external view returns(uint256 _amount)
     {
         uint256 lockedAmount =0;
         for(uint256 j = 0;j<getLockedListSize(_lockedAddress);j++) {
@@ -205,7 +221,7 @@ contract Founder is Ownable
         return lockedAmount;
     }
 
-    function getLockedEventFullAmount(address _lockedAddress) public view returns(uint256 _amount)
+    function getLockedEventFullAmount(address _lockedAddress) external view returns(uint256 _amount)
     {
         uint256 lockedAmount =0;
         for(uint256 j = 0;j<getLockedEventListSize(_lockedAddress);j++) {
@@ -221,7 +237,6 @@ contract Founder is Ownable
     {
         uint releasedDate = block.timestamp + _releaseDays * (1 days);
         LockItemByTime memory  lockItemByTime = LockItemByTime({amount:_amount, releaseDate:releasedDate,isRelease:0});
-        totalLockedAmount = totalLockedAmount + _amount;
         lockListByTime[_lockedAddress].push(lockItemByTime);
 
         emit TransferAndLock(_lockedAddress, _amount, _releaseDays);
@@ -231,7 +246,6 @@ contract Founder is Ownable
     {
         
         LockItemByEvent memory  lockItemByEvent = LockItemByEvent({amount:_amount, isRelease:0});
-        totalLockedEventAmount = totalLockedEventAmount + _amount;
         lockListByEvent[_lockedAddress].push(lockItemByEvent);
 
         emit TransferAndLockEvent(_lockedAddress, _amount);
@@ -243,7 +257,7 @@ contract Founder is Ownable
         if(getLockedTimeAt(msg.sender,_index)<=block.timestamp && getLockedIsReleaseAt(msg.sender,_index)==0)
         {
             lockListByTime[msg.sender][_index].isRelease=1;
-            // _rewardToken.safeTransfer(msg.sender, lockListByTime[msg.sender][_index].amount);
+            sellToken.safeTransfer(msg.sender, lockListByTime[msg.sender][_index].amount);
         }
         emit ReleaseMyToken(_index);
 
@@ -260,12 +274,13 @@ contract Founder is Ownable
         if(getLockedEventIsReleaseAt(msg.sender,_index)==0)
         {
             lockListByEvent[msg.sender][_index].isRelease=1;
+            sellToken.safeTransfer(msg.sender, lockListByEvent[msg.sender][_index].amount);
         }
         emit ReleaseMyTokenEvent(_index);
 
     }
 
-    function releaseAllMyToken() public
+    function releaseAllMyToken() external
     {
         for(uint256 i=0; i<getLockedListSize(msg.sender); i++)
         {
@@ -274,22 +289,23 @@ contract Founder is Ownable
 
     }
 
-    function releaseAllMyTokenEvent() onTokenGenerationEvent public
+    function releaseAllMyTokenEvent() onTokenGenerationEvent external
     {
         for(uint256 i=0; i<getLockedEventListSize(msg.sender); i++)
         {
             releaseMyTokenEvent(i);
         } 
-
+        emit ReleaseAllMyTokenEvent();
     }
     
-    function withdraw() public onlyOwner {
+    function withdraw() external onlyOwner {
+       require(address(msg.sender) != address(0), "msg.sender is 0");
        address payable sender = payable(address(msg.sender));
        sender.transfer(address(this).balance);
     }
 
-    function withdrawErc20(IERC20 token) public onlyOwner {
-        token.transfer(msg.sender, token.balanceOf(address(this)));
+    function withdrawErc20(ERC20 token) external onlyOwner {
+        token.safeTransfer(msg.sender, token.balanceOf(address(this)));
     }
 
 }
