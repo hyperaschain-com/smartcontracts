@@ -127,28 +127,24 @@ describe('Founder contract', function() {
       await usdtBuyer.approve(founder.address,usdt.balanceOf(buyer.address));
       const allowance = await usdt.allowance(buyer.address, founder.address);
       const buy = await founderBuyer.buy(parseEther("1000"));
-      
+
+      ethers.provider.send("evm_increaseTime", [30*24*60*60]);   // add 60 seconds
+      ethers.provider.send("evm_mine",[]);      // mine the next block
+
       const available = await founder.getAvailableAmount(buyer.address);
       const lockedFullAmount = await founder.getLockedFullAmount(buyer.address);
       const availableEvent = await founder.getAvailableEventAmount(buyer.address);
       const lockedEventFullAmount = await founder.getLockedEventFullAmount(buyer.address);
       
-      await founder.releaseAllMyToken();
-      await founder.releaseAllMyTokenEvent();
+      await founderBuyer.releaseAllMyToken();
+      await founderBuyer.releaseAllMyTokenEvent();
 
-      console.log("getAvailableAmount: "+ available);
-      console.log("getLockedFullAmount: ", lockedFullAmount);
-      console.log("getAvailableEventAmount: "+ availableEvent);
-      console.log("getLockedFullEventAmount: ", lockedEventFullAmount);
-      //chai.expect(available.eq(parseEther("75"))).true;
-      chai.expect(available.eq(parseEther("0"))).true;
-      chai.expect(lockedFullAmount.eq(parseEther("900"))).true;  
-      /**
-       getAvailableAmount: 0
-        getLockedFullAmount:  BigNumber { value: "900 000 000 000 000 000 000" }
-        getAvailableEventAmount: 100 000 000 000 000 000 000
-        getLockedFullEventAmount:  BigNumber { value: "100 000 000 000 000 000 000" }
-       *  */  
+      const hyraBalance = await hyra.balanceOf(buyer.address);
+      const usdtBalance = await usdt.balanceOf(buyer.address);
+            
+
+      chai.expect(available.eq(parseEther("75"))).true;
+      chai.expect(lockedFullAmount.eq(parseEther("900"))).true;    
        
     });
 
@@ -163,8 +159,6 @@ describe('Founder contract', function() {
 
       await usdtBuyer.approve(founder.address,usdt.balanceOf(buyer.address));
       const allowance = await usdt.allowance(buyer.address, founder.address);
-      // console.log("allowance1 : ", allowance);
-      // console.log("currentRound: ",await founder.currentRound());
       const buy = await founderBuyer.buy(parseEther("1000"));
       
       const hyraBalance = await hyra.balanceOf(buyer.address);
@@ -202,7 +196,6 @@ describe('Founder contract', function() {
       chai.expect(hyraBalance.eq(parseEther("1000"))).true;
       const usdtFounderBalance = await usdt.balanceOf(founder.address);
       const usdtBuyerBalance = await usdt.balanceOf(buyer.address);
-      console.log("usdt Owner balance: ", usdtFounderBalance);
       chai.expect(usdtFounderBalance.eq(parseEther("1"))).true;
       chai.expect(usdtBuyerBalance.eq(parseEther("99"))).true;
     });
